@@ -1,8 +1,9 @@
 import tomllib                              #用于解析TOML格式的配置文件
 import time                                 #用于时间相关操作
 import xml.etree.ElementTree as ET          #用于解析XML格式的配置文件
-import sqlite3
-import os
+import sqlite3                              #用于操作SQLite数据库
+import logging                              #用于记录日志信息
+import os                                   #用于操作文件和目录
 from WechatAPI import WechatAPIClient       #微信API模块
 from utils.decorators import *              #装饰器模块
 from utils.plugin_base import PluginBase    #插件必备模块
@@ -49,7 +50,7 @@ class Custom_WriteList_XXX(PluginBase):                 #定义Webhook类，继�
             self.sleep_word = config.get("Sleep_Word", "v安慰得过且过v飞奔过去弄i呵呵男女扣篮扣篮")
             self.welcome_word = config.get("Welcome_Word", "服务已启动")
             self.goodbye_word  = config.get("Goodbye_Word", "服务已退出")
-            self.whitelist_enable = config.get("Whitelist_Enable", False)
+            self.one_chat_mode = config.get("One_Chat_Mode", False)
 
 
     def clean_processed_msg_ids(self, time_window=3600):
@@ -71,6 +72,43 @@ class Custom_WriteList_XXX(PluginBase):                 #定义Webhook类，继�
             )'''
             cursor.execute(create_table_query)
 
+####################################处理文本消息####################################
+    @on_text_message(priority=80)         #装饰器，指定消息类型和优先级
+    async def handle_text(self, bot: WechatAPIClient, message: Dict):   #异步处理文本消息的方法
+        if not self.enable:
+            return True   
+        else:
+            msg_id = message["MsgId"]
+            content = message["Content"]
+            sender_wxid = message["SenderWxid"]
+            from_wxid = message["FromWxid"]
+            is_group = message["IsGroup"]
+            query = content
+
+            if msg_id in self.processed_msg_ids:  # 检查消息 ID 是否已经处理过
+                logger.info(f"消息 {msg_id} 已处理，跳过。")
+                return False
+            # 修改为字典操作，记录消息 ID 和处理时间
+            self.processed_msg_ids[msg_id] = time.time()
+            if is_group:    # 是否群聊
+                is_at = "group-chat"
+                # 是否群聊@机器人或私聊
+                if f"@{self.robotname}" in query:
+                    query = query.replace(f"@{self.robotname}", "").strip()
+                    is_at = "group-at"
+            else:
+                is_at = "one-one-chat"
+
+            msg={ 
+                "msg_id": msg_id,
+                "sender_wxid": sender_wxid,
+                "from_wxid": from_wxid,
+                "query": query,
+                "is_at": is_at,
+                "wxid": self.wxid,
+            }
+            return await self.handle_db(msg, bot)
+
 ####################################处理@消息####################################
     @on_at_message(priority=80)         #装饰器，指定消息类型和优先级
     async def handle_at(self, bot: WechatAPIClient, message: Dict):   #异步处理文本消息的方法
@@ -78,39 +116,40 @@ class Custom_WriteList_XXX(PluginBase):                 #定义Webhook类，继�
         if not self.enable:
             return None   
         else:
-            if not self.whitelist_enable:
-                return True
-            else:
-                msg_id = message["MsgId"]
-                content = message["Content"]
-                sender_wxid = message["SenderWxid"]
-                from_wxid = message["FromWxid"]
-                is_group = message["IsGroup"]
-                query = content
+            msg_id = message["MsgId"]
+            content = message["Content"]
+            sender_wxid = message["SenderWxid"]
+            from_wxid = message["FromWxid"]
+            is_group = message["IsGroup"]
+            query = content
 
-                if msg_id in self.processed_msg_ids:  # 检查消息 ID 是否已经处理过
-                    logger.info(f"消息 {msg_id} 已处理，跳过。")
-                    return False
-                # 修改为字典操作，记录消息 ID 和处理时间
-                self.processed_msg_ids[msg_id] = time.time()
-                if is_group:    # 是否群聊
-                    is_at = "group-at"
-                else:
-                    is_at = "one-one-chat"
-                msg={
-                    "msg_id": msg_id,
-                    "sender_wxid": sender_wxid,
-                    "from_wxid": from_wxid,
-                    "query": query,
-                    "is_at": is_at,
-                    "wxid": self.wxid,
-                }
-                return await self.handle_db(msg, bot)
+            if msg_id in self.processed_msg_ids:  # 检查消息 ID 是否已经处理过
+                logger.info(f"消息 {msg_id} 已处理，跳过。")
+                return False
+            # 修改为字典操作，记录消息 ID 和处理时间
+            self.processed_msg_ids[msg_id] = time.time()
+            if is_group:    # 是否群聊
+                is_at = "group-at"
+            else:
+                is_at = "one-one-chat"
+            msg={
+                "msg_id": msg_id,
+                "sender_wxid": sender_wxid,
+                "from_wxid": from_wxid,
+                "query": query,
+                "is_at": is_at,
+                "wxid": self.wxid,
+            }
+            return await self.handle_db(msg, bot)
 
 ####################################数据库操作####################################
     async def handle_db(self, msg, bot: WechatAPIClient):
         # 获取数据库文件路径
         db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Custom_WriteList.db')
+        if msg["is_at"] == "one-one-chat":
+                if not self.one_chat_mode:
+                    if msg["from_wxid"] not in self.admins:
+                        return False
         try:
             # 连接数据库
             conn = sqlite3.connect(db_path)
@@ -139,15 +178,17 @@ class Custom_WriteList_XXX(PluginBase):                 #定义Webhook类，继�
                 if msg["sender_wxid"] in self.admins:
                     if msg["query"] == self.wake_word:
                         cursor.execute(f"UPDATE {table_name} SET mode = 'on' WHERE id = ?", (from_wxid,))
+                        conn.commit()
                         mode = 'on'
                         await bot.send_text_message(msg["from_wxid"], self.welcome_word)
                         return False
                     elif msg["query"] == self.sleep_word:
                         cursor.execute(f"UPDATE {table_name} SET mode = 'off' WHERE id = ?", (from_wxid,))
+                        conn.commit()
                         mode = 'off'
                         await bot.send_text_message(msg["from_wxid"], self.goodbye_word)
                         return False
-                conn.commit()
+                
 
         except sqlite3.Error as e:
             logger.error(f"数据库操作出错: {e}")
