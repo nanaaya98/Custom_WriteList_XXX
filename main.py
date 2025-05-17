@@ -11,8 +11,8 @@ from loguru import logger                    #日志记录模块
 
 ################Webhook对接插件，用于将系统与外部服务通过Webhook进行集成################
 class Custom_WriteList_XXX(PluginBase):                 #定义Webhook类，继承PluginBase类
-    name = "Custom_WriteList_XXX"
-    description = "自定义白名单插件\n\n自定义唤醒、退出词，管理机器人在特定群聊中的唤醒和退出行为。\n\n作者：喵子柒"
+    name = "机器人群聊管理插件"
+    description = "管理机器人在特定群聊中的是否启用，可自定义唤醒、退出词。"
     author = "喵子柒"
     version = "1.0.0"
 
