@@ -29,6 +29,7 @@ class Custom_WriteList_XXX(PluginBase):                 #定义Webhook类，继�
             main_config = tomllib.load(f)
             # 获取管理员列表
             self.admins = main_config.get("XYBot", {}).get("admins", [])
+            self.whitelist  = main_config.get("XYBot", {}).get("whitelist ", [])
 
         # 读取插件配置
 
@@ -147,9 +148,16 @@ class Custom_WriteList_XXX(PluginBase):                 #定义Webhook类，继�
         # 获取数据库文件路径
         db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Custom_WriteList.db')
         if msg["is_at"] == "one-one-chat":
+            if msg["from_wxid"] in self.admins:
+                return True
+            else:
                 if not self.one_chat_mode:
-                    if msg["from_wxid"] not in self.admins:
-                        return False
+                        if msg["from_wxid"] not in self.whitelist:
+                            return False
+                        else:
+                            return True
+                else:
+                        return True 
         try:
             # 连接数据库
             conn = sqlite3.connect(db_path)
@@ -201,3 +209,4 @@ class Custom_WriteList_XXX(PluginBase):                 #定义Webhook类，继�
             return True
         else:
             return False
+
