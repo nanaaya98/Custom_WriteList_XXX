@@ -10,7 +10,7 @@
 
 ## 插件安装 
 
-1. 将插件文件夹复制到 `plugins` 目录，文件夹名称:Webhook_XXX
+1. 将插件文件夹复制到 `plugins` 目录，文件夹名称:Custom_WriteList_XXX
 2. 编辑 `config.toml` 配置文件
 3. 重启 XXXBot 或使用管理命令加载插件
 
@@ -21,13 +21,13 @@
 Enable = true                           # 是否启用此功能
 
 #机器人配置
-Robotname = "麻了"      #机器人昵称，务必设置准确，否则会影响群聊@消息的收发
+Robotname = "麻了"      #机器人昵称，务必设置准确，否则会影响唤醒词、退出词的判定
 Wxid = "wxid_27q2wvyh9j1p21"              #机器人Wxid
 
 #个体白名单功能，可以针对某一个群开启，仅限管理员
 One_Chat_Mode=false     #私聊是否所有人可用，true为所有人可用
-Wake_Word="/on"        #唤醒词，根据喜好自行设置，例：原神，启动！
-Sleep_Word="/off"      #退出词，根据喜好自行设置
+Wake_Word="/on"        #唤醒词，无需@；根据喜好自行设置，例：原神，启动！
+Sleep_Word="/off"      #退出词，无需@；根据喜好自行设置
 Welcome_Word="服务已启动，欢迎使用！"    #欢迎词，根据喜好自行设置
 Goodbye_Word="服务已退出，谢谢使用！"    #再见词，根据喜好自行设置
 ```
